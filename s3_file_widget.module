@@ -1,0 +1,78 @@
+<?php
+
+function s3_file_widget_field_widget_info(){
+  return array(
+    's3_file_widget' => array(
+      'label' => t('S3 File Widget'), 
+      'field types' => array('file'), 
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT, 
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ));
+}
+
+function s3_file_widget_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element){  
+  if ($instance['widget']['type']=='s3_file_widget') {
+      $element['fid'] = $element + array(
+	'#title' => t('File Name'),
+        '#description' => 'Enter correct file name from your amazon S3 bucket',
+        '#type' => 'textfield',
+        '#maxlength' => 128,
+        '#size' => 60, 
+        '#default_value' => $items[$delta]["filename"],
+        '#element_validate' => array('s3_file_widget_field_widget_validate')
+      );
+      $element['display'] = array(
+        '#type' => 'hidden',
+        '#default_value' => 1,
+      );
+      $element['description'] = array(
+        '#type' => 'hidden',
+        '#default_value' => "",
+      );
+      $element["fid"]["#description"] = 'Please, enter correct file name from your amazon S3 bucket';
+  }  
+  return $element;
+}
+
+function s3_file_widget_field_widget_validate(&$element, &$form_state, $form){
+  $frecord = s3_file_widget_create_file_record($element['#value']);
+  if($frecord){
+    $form_state['values']["field_videoupload"]['und'][0]["fid"] = $frecord["fid"];
+  }else{
+    form_error($element, 'Please, check the file name');
+  }
+}
+
+function s3_file_widget_create_file_record($filename) {
+  libraries_load('awssdk');
+  $s3 = new AmazonS3();
+
+  $response = $s3->get_object_metadata(variable_get('amazons3_bucket', 'ccapitalvideo'), $filename);
+  if ($response) {
+    $result = db_select('file_managed', 'fm')
+            ->fields('fm')
+            ->condition('uri', "s3://" . $filename)
+            ->execute()
+            ->fetchAssoc();
+    if ($result){
+      return $result;
+    }
+    $record = array(
+        "uid" => 1,
+        "filename" => $filename,
+        "uri" => "s3://" . $filename,
+        "filemime" => 'video/x-flv',
+        "filesize" => $response["Size"],
+        "status" => '1',
+        "timestamp" => time(),
+        "type" => 'video',
+        "origname" => $filename,
+    );
+    drupal_write_record('file_managed', $record);
+
+    return $record;
+  }
+  return false;
+}

@@ -1,0 +1,5 @@
+name = Amazon S3 File Widget
+description = File field widget for adding files that were already uploaded to amazon s3
+package = Amazon S3
+core = 7.x
+version = 7.x-1.x-dev
